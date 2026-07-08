@@ -218,6 +218,7 @@ if __name__ == '__main__':
             'mim': parse_requirements('requirements/mminstall.txt'),
             'tracking': parse_requirements('requirements/tracking.txt'),
             'multimodal': parse_requirements('requirements/multimodal.txt'),
+            'rfdetr': parse_requirements('requirements/rfdetr.txt'),
         },
         ext_modules=[],
         cmdclass={'build_ext': BuildExtension},

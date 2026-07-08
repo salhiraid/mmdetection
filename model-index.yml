@@ -67,6 +67,7 @@ Import:
   - configs/resnest/metafile.yml
   - configs/resnet_strikes_back/metafile.yml
   - configs/retinanet/metafile.yml
+  - configs/rfdetr/metafile.yml
   - configs/rpn/metafile.yml
   - configs/rtmdet/metafile.yml
   - configs/sabl/metafile.yml
