@@ -1,0 +1,80 @@
+Collections:
+  - Name: RF-DETR
+    Metadata:
+      Training Data: COCO
+      Training Techniques:
+        - AdamW
+        - Multi Scale Train
+        - Gradient Clip
+      Architecture:
+        - ResNet
+        - Transformer
+    Paper:
+      URL: https://arxiv.org/abs/2511.09554
+      Title: 'RF-DETR: Neural Architecture Search for Real-Time Detection Transformers'
+    README: configs/rfdetr/README.md
+    Code:
+      URL: https://github.com/open-mmlab/mmdetection/blob/main/mmdet/models/detectors/rfdetr.py
+      Version: v3.3.0
+
+Models:
+  - Name: rfdetr_nano_r50_8xb8-12e_coco
+    In Collection: RF-DETR
+    Config: configs/rfdetr/rfdetr_nano_r50_8xb8-12e_coco.py
+    Metadata:
+      Epochs: 12
+      RF-DETR Variant: Nano
+      Input Size: 384
+    Results:
+      - Task: Object Detection
+        Dataset: COCO
+  - Name: rfdetr_small_r50_8xb6-12e_coco
+    In Collection: RF-DETR
+    Config: configs/rfdetr/rfdetr_small_r50_8xb6-12e_coco.py
+    Metadata:
+      Epochs: 12
+      RF-DETR Variant: Small
+      Input Size: 512
+    Results:
+      - Task: Object Detection
+        Dataset: COCO
+  - Name: rfdetr_base_r50_8xb4-12e_coco
+    In Collection: RF-DETR
+    Config: configs/rfdetr/rfdetr_base_r50_8xb4-12e_coco.py
+    Metadata:
+      Epochs: 12
+      RF-DETR Variant: Base
+      Input Size: 560
+    Results:
+      - Task: Object Detection
+        Dataset: COCO
+  - Name: rfdetr_medium_r50_8xb4-12e_coco
+    In Collection: RF-DETR
+    Config: configs/rfdetr/rfdetr_medium_r50_8xb4-12e_coco.py
+    Metadata:
+      Epochs: 12
+      RF-DETR Variant: Medium
+      Input Size: 576
+    Results:
+      - Task: Object Detection
+        Dataset: COCO
+  - Name: rfdetr_large_r50_8xb2-12e_coco
+    In Collection: RF-DETR
+    Config: configs/rfdetr/rfdetr_large_r50_8xb2-12e_coco.py
+    Metadata:
+      Epochs: 12
+      RF-DETR Variant: Large
+      Input Size: 704
+    Results:
+      - Task: Object Detection
+        Dataset: COCO
+  - Name: rfdetr_r50_8xb2-12e_coco
+    In Collection: RF-DETR
+    Config: configs/rfdetr/rfdetr_r50_8xb2-12e_coco.py
+    Metadata:
+      Epochs: 12
+      RF-DETR Variant: Base Alias
+      Input Size: 560
+    Results:
+      - Task: Object Detection
+        Dataset: COCO

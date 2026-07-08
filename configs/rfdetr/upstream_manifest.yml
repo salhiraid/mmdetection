@@ -1,0 +1,58 @@
+# Mirrored Roboflow RF-DETR config manifest.
+# Use tools/rfdetr/check_upstream_models.py to verify these files.
+configs:
+  - file: rfdetr_base.yaml
+    source: https://raw.githubusercontent.com/roboflow/rf-detr/develop/configs/rfdetr_base.yaml
+    sha256: 2924711b36aeae03cccee3cdf901f13efc6c646ac86517c3a1d24da4190602c7
+    class_path: rfdetr.config.RFDETRBaseConfig
+    train_config: rfdetr.config.TrainConfig
+  - file: rfdetr_large.yaml
+    source: https://raw.githubusercontent.com/roboflow/rf-detr/develop/configs/rfdetr_large.yaml
+    sha256: fae13f1e2970f54c36d2d9318b4b1a9eb11e887a941c0787d0e41601c7cd5e39
+    class_path: rfdetr.config.RFDETRLargeConfig
+    train_config: rfdetr.config.TrainConfig
+  - file: rfdetr_medium.yaml
+    source: https://raw.githubusercontent.com/roboflow/rf-detr/develop/configs/rfdetr_medium.yaml
+    sha256: e332933f1b7949fdd49ad1abe52adca170f77a460cde65575b8214762939464d
+    class_path: rfdetr.config.RFDETRMediumConfig
+    train_config: rfdetr.config.TrainConfig
+  - file: rfdetr_nano.yaml
+    source: https://raw.githubusercontent.com/roboflow/rf-detr/develop/configs/rfdetr_nano.yaml
+    sha256: 3cd0726f3c457e861b98c2585af674f42d8b0a830c9d2993671bf8ed95c2e736
+    class_path: rfdetr.config.RFDETRNanoConfig
+    train_config: rfdetr.config.TrainConfig
+  - file: rfdetr_seg_2xlarge.yaml
+    source: https://raw.githubusercontent.com/roboflow/rf-detr/develop/configs/rfdetr_seg_2xlarge.yaml
+    sha256: f4cf7890f4d62a6f6830d9d4ae3b57b255945a4002adfc4b6321a15dddf9c931
+    class_path: rfdetr.config.RFDETRSeg2XLargeConfig
+    train_config: rfdetr.config.SegmentationTrainConfig
+  - file: rfdetr_seg_large.yaml
+    source: https://raw.githubusercontent.com/roboflow/rf-detr/develop/configs/rfdetr_seg_large.yaml
+    sha256: 9a5cb9f7da8175cce5563c52cbd1662c9552ef1e08d04b0adb0761bf1723c35b
+    class_path: rfdetr.config.RFDETRSegLargeConfig
+    train_config: rfdetr.config.SegmentationTrainConfig
+  - file: rfdetr_seg_medium.yaml
+    source: https://raw.githubusercontent.com/roboflow/rf-detr/develop/configs/rfdetr_seg_medium.yaml
+    sha256: c4ddd9a07f54eceba5f02937fd2b7c95cd01791311024b28b17a0e941722012e
+    class_path: rfdetr.config.RFDETRSegMediumConfig
+    train_config: rfdetr.config.SegmentationTrainConfig
+  - file: rfdetr_seg_nano.yaml
+    source: https://raw.githubusercontent.com/roboflow/rf-detr/develop/configs/rfdetr_seg_nano.yaml
+    sha256: dc5edb0c43fd2dd1c13629167a1c6962c85b298f98c33ff43883546d95511d6e
+    class_path: rfdetr.config.RFDETRSegNanoConfig
+    train_config: rfdetr.config.SegmentationTrainConfig
+  - file: rfdetr_seg_small.yaml
+    source: https://raw.githubusercontent.com/roboflow/rf-detr/develop/configs/rfdetr_seg_small.yaml
+    sha256: 2c21484b9ea0ca133932be5b84293e89e30b93703defe4a384466397ff2f03be
+    class_path: rfdetr.config.RFDETRSegSmallConfig
+    train_config: rfdetr.config.SegmentationTrainConfig
+  - file: rfdetr_seg_xlarge.yaml
+    source: https://raw.githubusercontent.com/roboflow/rf-detr/develop/configs/rfdetr_seg_xlarge.yaml
+    sha256: 4dc66369781abf50d1446bba4d0dfe7c21e06dac92b683019f210e188d7e131f
+    class_path: rfdetr.config.RFDETRSegXLargeConfig
+    train_config: rfdetr.config.SegmentationTrainConfig
+  - file: rfdetr_small.yaml
+    source: https://raw.githubusercontent.com/roboflow/rf-detr/develop/configs/rfdetr_small.yaml
+    sha256: 85fda8cf56a0b130a57b0f8956f2d4909380881b0bec692c9b084d3d809e2db0
+    class_path: rfdetr.config.RFDETRSmallConfig
+    train_config: rfdetr.config.TrainConfig
