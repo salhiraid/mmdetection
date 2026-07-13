@@ -148,3 +148,7 @@ class MMDetRFDETR(BaseDetector):
                     dtype=torch.float32, device=device)
             targets.append(target)
         return targets
+
+
+# Backward-compatible registry alias for configs that use type='RFDETR'.
+MODELS.register_module(name='RFDETR', module=MMDetRFDETR)
