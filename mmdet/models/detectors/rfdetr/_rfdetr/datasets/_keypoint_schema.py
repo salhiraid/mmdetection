@@ -27,7 +27,7 @@ __all__ = [
 ]
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True)
 class CocoKeypointSchema:
     """Keypoint schema inferred from COCO category metadata.
 
@@ -54,7 +54,7 @@ class CocoKeypointSchema:
     keypoint_flip_pairs: list[int] = field(default_factory=list)
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True)
 class YoloKeypointSchema:
     """Keypoint schema inferred from an Ultralytics YOLO pose YAML file.
 

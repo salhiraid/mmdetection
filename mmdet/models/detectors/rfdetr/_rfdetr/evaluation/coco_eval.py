@@ -66,7 +66,7 @@ _DEFAULT_CUSTOM_KEYPOINT_OKS_SIGMA = 0.05
 _WARNED_CUSTOM_KEYPOINT_OKS_COUNTS: set[int] = set()
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True)
 class _KeypointCategoryGroup:
     """Keypoint categories sharing one keypoint count and OKS sigma vector."""
 
@@ -75,7 +75,7 @@ class _KeypointCategoryGroup:
     keypoint_oks_sigmas: list[float] | None
 
 
-@dataclass(slots=True)
+@dataclass
 class _GroupedKeypointCOCOeval:
     """Aggregate COCO keypoint stats for categories with different keypoint counts."""
 
