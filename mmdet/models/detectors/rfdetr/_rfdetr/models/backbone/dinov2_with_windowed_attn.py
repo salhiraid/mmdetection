@@ -38,7 +38,7 @@ import math
 import torch
 from torch import nn
 from torch.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
-from transformers import BackboneConfigMixin, BackboneMixin  # public API; stable across all transformers v5.x
+import transformers
 from transformers.activations import ACT2FN
 from transformers.configuration_utils import PretrainedConfig
 from transformers.modeling_outputs import (
@@ -58,6 +58,31 @@ from transformers.utils import (
 )
 
 logger = logging.get_logger(__name__)
+
+
+class _BackboneConfigMixinFallback:
+    """Small fallback for transformers versions without BackboneConfigMixin."""
+
+    pass
+
+
+class _BackboneMixinFallback:
+    """Small fallback for transformers versions without BackboneMixin.
+
+    RF-DETR only needs the mixin to expose stage metadata derived from the
+    config. Newer transformers versions provide this, but some MMDetection
+    environments still ship older transformers builds where the symbols are not
+    exported from ``transformers``.
+    """
+
+    def _init_transformers_backbone(self) -> None:
+        self.stage_names = list(getattr(self.config, "stage_names"))
+        self.out_features = list(getattr(self.config, "_out_features"))
+        self.out_indices = list(getattr(self.config, "_out_indices"))
+
+
+BackboneConfigMixin = getattr(transformers, "BackboneConfigMixin", _BackboneConfigMixinFallback)
+BackboneMixin = getattr(transformers, "BackboneMixin", _BackboneMixinFallback)
 
 
 def _find_pruneable_heads_and_indices(
