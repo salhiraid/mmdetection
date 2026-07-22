@@ -176,6 +176,7 @@ def _comparison_page(st, pd, bundle: Dict[str, Any]) -> None:
 
 def _image_browser_page(st, pd, bundle: Dict[str, Any]) -> None:
     images = bundle["dataset"]["images"]
+    image_by_id = {img["image_id"]: img for img in images}
     detectors = {d["detector_name"]: d for d in bundle["detectors"]}
     selected = st.multiselect("Detectors", list(detectors), default=list(detectors)[:1])
     error_types = sorted({m["status"] for d in detectors.values() for m in d["prediction_matches"]})
@@ -183,25 +184,60 @@ def _image_browser_page(st, pd, bundle: Dict[str, Any]) -> None:
     classes = bundle["dataset"]["classes"]
     selected_classes = st.multiselect("Classes", classes)
     search = st.text_input("Image name or ID")
+    browse_mode = st.radio("Browse", ["Images", "Problems"], horizontal=True)
+    hide_correct = st.checkbox("Hide correct predictions", value=False)
+
+    all_selected_matches = [
+        m for name in selected for m in detectors[name]["prediction_matches"]
+    ]
+    matches_by_image: Dict[str, List[Dict[str, Any]]] = {}
+    for match in all_selected_matches:
+        matches_by_image.setdefault(match["image_id"], []).append(match)
+
     candidates = []
     for img in images:
         if search and search not in img["image_id"] and search.lower() not in img["file_name"].lower():
             continue
-        matches = [m for name in selected for m in detectors[name]["prediction_matches"] if m["image_id"] == img["image_id"]]
+        matches = matches_by_image.get(img["image_id"], [])
+        shown_matches = [m for m in matches if m["status"] in selected_errors]
+        if hide_correct:
+            shown_matches = [m for m in shown_matches if m["status"] != "true_positive"]
         if selected_errors and not any(m["status"] in selected_errors for m in matches):
             continue
         if selected_classes and not any(m["pred_class_name"] in selected_classes or m.get("gt_class_name") in selected_classes for m in matches):
             continue
-        candidates.append(img)
+        errors = [m for m in shown_matches if m["status"] != "true_positive"]
+        candidates.append({
+            **img,
+            "predictions": len(matches),
+            "shown_predictions": len(shown_matches),
+            "errors": len(errors),
+            "false_positives": sum(1 for m in errors if m.get("matched_gt_id") is None),
+            "duplicates": sum(1 for m in errors if m["status"] == "duplicate_detection"),
+            "top_statuses": ", ".join(pd.Series([m["status"] for m in errors]).value_counts().head(3).index.tolist()) if errors else "clean",
+        })
     if not candidates:
         st.info("No images match the filters.")
         return
-    idx = st.number_input("Image index", min_value=0, max_value=len(candidates) - 1, value=0)
-    image = candidates[int(idx)]
+
+    problem_rows = _problem_rows(pd, candidates, matches_by_image, selected_errors, selected_classes, hide_correct)
+    rows = problem_rows if browse_mode == "Problems" and problem_rows else candidates
+    if browse_mode == "Problems" and not problem_rows:
+        st.info("No individual problem rows match the current filters; showing filtered images instead.")
+        rows = candidates
+
+    selected_pos = _fast_browser_controls(st, pd, rows, browse_mode)
+    image = image_by_id[rows[selected_pos]["image_id"]]
+
     matches = []
     gt_matches = []
     for name in selected:
-        matches.extend([m for m in detectors[name]["prediction_matches"] if m["image_id"] == image["image_id"] and m["status"] in selected_errors])
+        matches.extend([
+            m for m in detectors[name]["prediction_matches"]
+            if m["image_id"] == image["image_id"]
+            and m["status"] in selected_errors
+            and (not hide_correct or m["status"] != "true_positive")
+        ])
         gt_matches.extend([g for g in detectors[name]["ground_truth_matches"] if g["image_id"] == image["image_id"]])
     from tools.detection_analysis.models import GroundTruthMatchRecord, ImageRecord, MatchRecord
     rendered = render_image(
@@ -209,8 +245,113 @@ def _image_browser_page(st, pd, bundle: Dict[str, Any]) -> None:
         [MatchRecord(**m) for m in matches],
         [GroundTruthMatchRecord(**g) for g in gt_matches if g["status"] == "false_negative"],
     )
+    st.caption(f"{selected_pos + 1} / {len(rows)} in {browse_mode.lower()} view - image {image['image_id']} - {image['file_name']}")
     st.image(rendered, use_container_width=True)
     st.dataframe(pd.DataFrame(matches), use_container_width=True)
+
+
+def _fast_browser_controls(st, pd, rows: List[Dict[str, Any]], browse_mode: str) -> int:
+    """Render fast scrolling, row selection, and thumbnail controls."""
+
+    key_prefix = f"browser_{browse_mode.lower()}"
+    index_key = f"{key_prefix}_index"
+    if index_key not in st.session_state or st.session_state[index_key] >= len(rows):
+        st.session_state[index_key] = 0
+
+    col_prev, col_slider, col_next, col_jump = st.columns([1, 6, 1, 2])
+    with col_prev:
+        if st.button("Previous", use_container_width=True):
+            st.session_state[index_key] = max(0, st.session_state[index_key] - 1)
+    with col_next:
+        if st.button("Next", use_container_width=True):
+            st.session_state[index_key] = min(len(rows) - 1, st.session_state[index_key] + 1)
+    with col_slider:
+        st.session_state[index_key] = st.slider(
+            "Fast scroll",
+            min_value=0,
+            max_value=len(rows) - 1,
+            value=int(st.session_state[index_key]),
+            format="%d",
+        )
+    with col_jump:
+        jump = st.number_input("Jump", min_value=1, max_value=len(rows), value=int(st.session_state[index_key]) + 1)
+        st.session_state[index_key] = int(jump) - 1
+
+    table_df = pd.DataFrame(rows).copy()
+    preferred = [
+        "image_id", "file_name", "detector_name", "status", "pred_class_name",
+        "gt_class_name", "score", "iou", "errors", "predictions",
+        "false_positives", "duplicates", "top_statuses",
+    ]
+    visible_cols = [c for c in preferred if c in table_df.columns]
+    table_df = table_df[visible_cols]
+    event = st.dataframe(
+        table_df,
+        use_container_width=True,
+        height=360,
+        selection_mode="single-row",
+        on_select="rerun",
+        key=f"{key_prefix}_table",
+    )
+    selected_rows = event.selection.rows if hasattr(event, "selection") else []
+    if selected_rows:
+        st.session_state[index_key] = int(selected_rows[0])
+
+    if browse_mode == "Images" and st.checkbox("Show scrollable thumbnails", value=False):
+        page_size = st.slider("Thumbnails per page", 12, 96, 36, 12)
+        page_count = max(1, (len(rows) + page_size - 1) // page_size)
+        page = st.number_input("Thumbnail page", min_value=1, max_value=page_count, value=1)
+        start = (int(page) - 1) * page_size
+        with st.container(height=520):
+            for row_start in range(start, min(start + page_size, len(rows)), 4):
+                cols = st.columns(4)
+                for offset, col in enumerate(cols):
+                    pos = row_start + offset
+                    if pos >= min(start + page_size, len(rows)):
+                        continue
+                    row = rows[pos]
+                    with col:
+                        if row.get("img_path"):
+                            st.image(row["img_path"], use_container_width=True)
+                        if st.button(f"{pos + 1}: {row['file_name']}", key=f"{key_prefix}_thumb_{pos}", use_container_width=True):
+                            st.session_state[index_key] = pos
+                        st.caption(f"errors {row.get('errors', 0)} | preds {row.get('predictions', 0)}")
+
+    return int(st.session_state[index_key])
+
+
+def _problem_rows(
+    pd,
+    candidates: List[Dict[str, Any]],
+    matches_by_image: Dict[str, List[Dict[str, Any]]],
+    selected_errors: List[str],
+    selected_classes: List[str],
+    hide_correct: bool,
+) -> List[Dict[str, Any]]:
+    """Flatten filtered predictions into scrollable problem rows."""
+
+    candidate_ids = {img["image_id"] for img in candidates}
+    rows = []
+    for image_id in candidate_ids:
+        for match in matches_by_image.get(image_id, []):
+            if match["status"] not in selected_errors:
+                continue
+            if hide_correct and match["status"] == "true_positive":
+                continue
+            if selected_classes and match["pred_class_name"] not in selected_classes and match.get("gt_class_name") not in selected_classes:
+                continue
+            rows.append({
+                "image_id": image_id,
+                "file_name": next(img["file_name"] for img in candidates if img["image_id"] == image_id),
+                "detector_name": match["detector_name"],
+                "status": match["status"],
+                "pred_class_name": match["pred_class_name"],
+                "gt_class_name": match.get("gt_class_name"),
+                "score": match["score"],
+                "iou": match["iou"],
+                "prediction_id": match["prediction_id"],
+            })
+    return sorted(rows, key=lambda row: (row["status"] == "true_positive", row["image_id"], -row["score"]))
 
 
 def _error_explorer_page(st, pd, bundle: Dict[str, Any]) -> None:
@@ -260,4 +401,3 @@ if __name__ == "__main__":
         main()
     else:
         _launch_streamlit()
-
