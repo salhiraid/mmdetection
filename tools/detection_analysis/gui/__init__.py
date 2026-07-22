@@ -1,0 +1,2 @@
+"""Streamlit GUI pages."""
+

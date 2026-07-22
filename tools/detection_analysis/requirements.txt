@@ -1,0 +1,8 @@
+streamlit
+plotly
+pandas
+pillow
+pycocotools
+jinja2
+pyarrow
+
