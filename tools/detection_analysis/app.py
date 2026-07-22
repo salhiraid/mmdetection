@@ -178,14 +178,31 @@ def _image_browser_page(st, pd, bundle: Dict[str, Any]) -> None:
     images = bundle["dataset"]["images"]
     image_by_id = {img["image_id"]: img for img in images}
     detectors = {d["detector_name"]: d for d in bundle["detectors"]}
-    selected = st.multiselect("Detectors", list(detectors), default=list(detectors)[:1])
+    selected = st.multiselect("Overlay detectors", list(detectors), default=list(detectors)[:1])
     error_types = sorted({m["status"] for d in detectors.values() for m in d["prediction_matches"]})
     selected_errors = st.multiselect("Error types", error_types, default=error_types)
     classes = bundle["dataset"]["classes"]
     selected_classes = st.multiselect("Classes", classes)
     search = st.text_input("Image name or ID")
-    browse_mode = st.radio("Browse", ["Images", "Problems"], horizontal=True)
-    hide_correct = st.checkbox("Hide correct predictions", value=False)
+    browse_col, display_col, label_col, color_col = st.columns(4)
+    with browse_col:
+        browse_mode = st.radio("Browse list", ["Images", "Problems"], horizontal=True)
+    with display_col:
+        display_method = st.radio("Display boxes", ["Predictions", "Problems only"], horizontal=True)
+    with label_col:
+        default_label = "Problem" if display_method == "Problems only" else "Class"
+        label_choice = st.selectbox("Box label", ["Class", "Problem", "Class + problem", "None"], index=["Class", "Problem", "Class + problem", "None"].index(default_label))
+    with color_col:
+        default_color = "Error / problem" if display_method == "Problems only" else "Class"
+        color_choice = st.selectbox("Box colors", ["Class", "Error / problem"], index=["Class", "Error / problem"].index(default_color))
+    detail_col_a, detail_col_b, detail_col_c = st.columns(3)
+    with detail_col_a:
+        show_detector_name = st.checkbox("Show detector name", value=len(selected) > 1)
+    with detail_col_b:
+        show_scores = st.checkbox("Show scores", value=True)
+    with detail_col_c:
+        show_iou = st.checkbox("Show IoU", value=True)
+    hide_correct = display_method == "Problems only"
 
     all_selected_matches = [
         m for name in selected for m in detectors[name]["prediction_matches"]
@@ -193,34 +210,46 @@ def _image_browser_page(st, pd, bundle: Dict[str, Any]) -> None:
     matches_by_image: Dict[str, List[Dict[str, Any]]] = {}
     for match in all_selected_matches:
         matches_by_image.setdefault(match["image_id"], []).append(match)
+    gt_by_image: Dict[str, List[Dict[str, Any]]] = {}
+    for name in selected:
+        for gt_match in detectors[name]["ground_truth_matches"]:
+            gt_by_image.setdefault(gt_match["image_id"], []).append(gt_match)
 
     candidates = []
     for img in images:
         if search and search not in img["image_id"] and search.lower() not in img["file_name"].lower():
             continue
         matches = matches_by_image.get(img["image_id"], [])
+        false_negatives = [g for g in gt_by_image.get(img["image_id"], []) if g["status"] == "false_negative"]
         shown_matches = [m for m in matches if m["status"] in selected_errors]
         if hide_correct:
             shown_matches = [m for m in shown_matches if m["status"] != "true_positive"]
-        if selected_errors and not any(m["status"] in selected_errors for m in matches):
+        if selected_errors and not any(m["status"] in selected_errors for m in matches) and not false_negatives:
             continue
-        if selected_classes and not any(m["pred_class_name"] in selected_classes or m.get("gt_class_name") in selected_classes for m in matches):
+        if selected_classes and not (
+            any(m["pred_class_name"] in selected_classes or m.get("gt_class_name") in selected_classes for m in matches)
+            or any(g["gt_class_name"] in selected_classes for g in false_negatives)
+        ):
             continue
         errors = [m for m in shown_matches if m["status"] != "true_positive"]
+        if display_method == "Problems only" and not errors and not false_negatives:
+            continue
+        top_statuses = [m["status"] for m in errors] + (["false_negative"] if false_negatives else [])
         candidates.append({
             **img,
             "predictions": len(matches),
             "shown_predictions": len(shown_matches),
             "errors": len(errors),
+            "false_negatives": len(false_negatives),
             "false_positives": sum(1 for m in errors if m.get("matched_gt_id") is None),
             "duplicates": sum(1 for m in errors if m["status"] == "duplicate_detection"),
-            "top_statuses": ", ".join(pd.Series([m["status"] for m in errors]).value_counts().head(3).index.tolist()) if errors else "clean",
+            "top_statuses": ", ".join(pd.Series(top_statuses).value_counts().head(3).index.tolist()) if top_statuses else "clean",
         })
     if not candidates:
         st.info("No images match the filters.")
         return
 
-    problem_rows = _problem_rows(pd, candidates, matches_by_image, selected_errors, selected_classes, hide_correct)
+    problem_rows = _problem_rows(candidates, matches_by_image, gt_by_image, selected_errors, selected_classes)
     rows = problem_rows if browse_mode == "Problems" and problem_rows else candidates
     if browse_mode == "Problems" and not problem_rows:
         st.info("No individual problem rows match the current filters; showing filtered images instead.")
@@ -240,10 +269,26 @@ def _image_browser_page(st, pd, bundle: Dict[str, Any]) -> None:
         ])
         gt_matches.extend([g for g in detectors[name]["ground_truth_matches"] if g["image_id"] == image["image_id"]])
     from tools.detection_analysis.models import GroundTruthMatchRecord, ImageRecord, MatchRecord
+    label_mode = {
+        "Class": "class",
+        "Problem": "problem",
+        "Class + problem": "class_problem",
+        "None": "none",
+    }[label_choice]
+    color_mode = "class" if color_choice == "Class" else "error"
+    rendered_gt_matches = [
+        GroundTruthMatchRecord(**g) for g in gt_matches
+        if display_method == "Problems only" and g["status"] == "false_negative"
+    ]
     rendered = render_image(
         ImageRecord(**image),
         [MatchRecord(**m) for m in matches],
-        [GroundTruthMatchRecord(**g) for g in gt_matches if g["status"] == "false_negative"],
+        rendered_gt_matches,
+        label_mode=label_mode,
+        color_mode=color_mode,
+        show_scores=show_scores,
+        show_iou=show_iou,
+        show_detector=show_detector_name,
     )
     st.caption(f"{selected_pos + 1} / {len(rows)} in {browse_mode.lower()} view - image {image['image_id']} - {image['file_name']}")
     st.image(rendered, use_container_width=True)
@@ -281,7 +326,7 @@ def _fast_browser_controls(st, pd, rows: List[Dict[str, Any]], browse_mode: str)
     preferred = [
         "image_id", "file_name", "detector_name", "status", "pred_class_name",
         "gt_class_name", "score", "iou", "errors", "predictions",
-        "false_positives", "duplicates", "top_statuses",
+        "false_negatives", "false_positives", "duplicates", "top_statuses",
     ]
     visible_cols = [c for c in preferred if c in table_df.columns]
     table_df = table_df[visible_cols]
@@ -321,28 +366,28 @@ def _fast_browser_controls(st, pd, rows: List[Dict[str, Any]], browse_mode: str)
 
 
 def _problem_rows(
-    pd,
     candidates: List[Dict[str, Any]],
     matches_by_image: Dict[str, List[Dict[str, Any]]],
+    gt_by_image: Dict[str, List[Dict[str, Any]]],
     selected_errors: List[str],
     selected_classes: List[str],
-    hide_correct: bool,
 ) -> List[Dict[str, Any]]:
     """Flatten filtered predictions into scrollable problem rows."""
 
     candidate_ids = {img["image_id"] for img in candidates}
+    file_by_image = {img["image_id"]: img["file_name"] for img in candidates}
     rows = []
     for image_id in candidate_ids:
         for match in matches_by_image.get(image_id, []):
             if match["status"] not in selected_errors:
                 continue
-            if hide_correct and match["status"] == "true_positive":
+            if match["status"] == "true_positive":
                 continue
             if selected_classes and match["pred_class_name"] not in selected_classes and match.get("gt_class_name") not in selected_classes:
                 continue
             rows.append({
                 "image_id": image_id,
-                "file_name": next(img["file_name"] for img in candidates if img["image_id"] == image_id),
+                "file_name": file_by_image[image_id],
                 "detector_name": match["detector_name"],
                 "status": match["status"],
                 "pred_class_name": match["pred_class_name"],
@@ -351,7 +396,23 @@ def _problem_rows(
                 "iou": match["iou"],
                 "prediction_id": match["prediction_id"],
             })
-    return sorted(rows, key=lambda row: (row["status"] == "true_positive", row["image_id"], -row["score"]))
+        for gt_match in gt_by_image.get(image_id, []):
+            if gt_match["status"] != "false_negative":
+                continue
+            if selected_classes and gt_match["gt_class_name"] not in selected_classes:
+                continue
+            rows.append({
+                "image_id": image_id,
+                "file_name": file_by_image[image_id],
+                "detector_name": gt_match["detector_name"],
+                "status": "false_negative",
+                "pred_class_name": None,
+                "gt_class_name": gt_match["gt_class_name"],
+                "score": None,
+                "iou": gt_match["iou"],
+                "prediction_id": None,
+            })
+    return sorted(rows, key=lambda row: (row["image_id"], -(row["score"] or 0.0), row["status"]))
 
 
 def _error_explorer_page(st, pd, bundle: Dict[str, Any]) -> None:

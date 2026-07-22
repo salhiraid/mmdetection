@@ -9,14 +9,15 @@ from PIL import Image, ImageDraw, ImageFont
 
 from tools.detection_analysis.models import GroundTruthMatchRecord, ImageRecord, MatchRecord
 from tools.detection_analysis.utils.bbox import clip_box
-from tools.detection_analysis.visualization.colors import color_for_status
+from tools.detection_analysis.visualization.colors import color_for_class, color_for_status
 
 
 def render_image(
     image: ImageRecord,
     prediction_matches: Iterable[MatchRecord] = (),
     ground_truth_matches: Iterable[GroundTruthMatchRecord] = (),
-    show_labels: bool = True,
+    label_mode: str = "class_problem",
+    color_mode: str = "error",
     show_scores: bool = True,
     show_iou: bool = True,
     show_detector: bool = True,
@@ -32,20 +33,46 @@ def render_image(
     draw = ImageDraw.Draw(img)
     line_width = max(2, int(min(img.size) / 250))
     for gt in ground_truth_matches:
-        _draw_box(draw, gt.gt_bbox, img.size, "#1f77b4", line_width, f"GT {gt.gt_class_name} | {gt.status}" if show_labels else "")
+        color = color_for_class(gt.gt_class_id) if color_mode == "class" else color_for_status(gt.status)
+        _draw_box(draw, gt.gt_bbox, img.size, color, line_width, _gt_label(gt, label_mode))
     for pred in prediction_matches:
-        parts: List[str] = []
-        if show_detector:
-            parts.append(pred.detector_name)
-        if show_labels:
-            parts.append(pred.pred_class_name)
-        if show_scores:
-            parts.append(f"{pred.score:.2f}")
-        if show_iou:
-            parts.append(f"IoU {pred.iou:.2f}")
-        parts.append(pred.status)
-        _draw_box(draw, pred.pred_bbox, img.size, color_for_status(pred.status), line_width, " | ".join(parts))
+        label = _prediction_label(pred, label_mode, show_scores, show_iou, show_detector)
+        color = color_for_class(pred.pred_class_id) if color_mode == "class" else color_for_status(pred.status)
+        _draw_box(draw, pred.pred_bbox, img.size, color, line_width, label)
     return img
+
+
+def _prediction_label(
+    pred: MatchRecord,
+    label_mode: str,
+    show_scores: bool,
+    show_iou: bool,
+    show_detector: bool,
+) -> str:
+    parts: List[str] = []
+    if show_detector:
+        parts.append(pred.detector_name)
+    if label_mode == "class":
+        parts.append(pred.pred_class_name)
+    elif label_mode == "problem":
+        parts.append(pred.status)
+    elif label_mode == "class_problem":
+        parts.extend([pred.pred_class_name, pred.status])
+    if show_scores:
+        parts.append(f"{pred.score:.2f}")
+    if show_iou:
+        parts.append(f"IoU {pred.iou:.2f}")
+    return " | ".join(parts)
+
+
+def _gt_label(gt: GroundTruthMatchRecord, label_mode: str) -> str:
+    if label_mode == "none":
+        return ""
+    if label_mode == "problem":
+        return gt.status
+    if label_mode == "class":
+        return f"GT {gt.gt_class_name}"
+    return f"GT {gt.gt_class_name} | {gt.status}"
 
 
 def _draw_box(draw: ImageDraw.ImageDraw, box, image_size, color: str, line_width: int, label: str) -> None:
@@ -67,4 +94,3 @@ def _draw_box(draw: ImageDraw.ImageDraw, box, image_size, color: str, line_width
 def _fit_label(label: str, max_pixels: int) -> str:
     max_chars = max(12, max_pixels // 6)
     return label if len(label) <= max_chars else label[: max_chars - 1] + "..."
-
