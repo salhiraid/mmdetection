@@ -153,11 +153,51 @@ def _overview_page(st, pd, bundle: Dict[str, Any]) -> None:
         row.update({k: v for k, v in det.get("coco_metrics", {}).items() if isinstance(v, (int, float))})
         rows.append(row)
         st.subheader(det["detector_name"])
-        st.dataframe(pd.DataFrame([row]), use_container_width=True)
-        st.plotly_chart(status_counts_bar(det["metrics"].get("prediction_status_counts", {}), "Prediction status counts"), use_container_width=True)
-        st.dataframe(pd.DataFrame(det["metrics"].get("per_class", {})).T, use_container_width=True)
+        _render_metric_cards(st, det)
+        with st.expander("Full metrics table", expanded=False):
+            st.dataframe(pd.DataFrame([row]), use_container_width=True)
+        chart_col, class_col = st.columns([1, 1])
+        with chart_col:
+            st.plotly_chart(status_counts_bar(det["metrics"].get("prediction_status_counts", {}), "Prediction status counts"), use_container_width=True)
+        with class_col:
+            st.dataframe(pd.DataFrame(det["metrics"].get("per_class", {})).T, use_container_width=True)
     if rows:
         st.plotly_chart(metric_bar(rows, "f1"), use_container_width=True)
+
+
+def _render_metric_cards(st, detector: Dict[str, Any]) -> None:
+    """Render readable metric cards for one detector."""
+
+    metrics = detector.get("metrics", {})
+    coco = detector.get("coco_metrics", {})
+    coco_cols = st.columns(6)
+    for col, key in zip(coco_cols, ["mAP", "AP50", "AP75", "AP_small", "AP_medium", "AP_large"]):
+        value = coco.get(key)
+        col.metric(key, _fmt_metric(value))
+
+    custom_cols = st.columns(7)
+    for col, key in zip(custom_cols, ["tp", "fp", "fn", "precision", "recall", "f1", "mean_tp_iou"]):
+        label = key.upper() if key in {"tp", "fp", "fn"} else key.replace("_", " ").title()
+        col.metric(label, _fmt_metric(metrics.get(key)))
+
+    error_cols = st.columns(5)
+    error_keys = [
+        ("Background FP", "background_false_positives"),
+        ("Classification", "classification_errors"),
+        ("Localization", "localization_errors"),
+        ("Duplicates", "duplicate_detections"),
+        ("Images w/ errors", "images_with_errors"),
+    ]
+    for col, (label, key) in zip(error_cols, error_keys):
+        col.metric(label, _fmt_metric(metrics.get(key)))
+
+
+def _fmt_metric(value: Any) -> str:
+    if value is None:
+        return "n/a"
+    if isinstance(value, float):
+        return f"{value:.3f}"
+    return str(value)
 
 
 def _comparison_page(st, pd, bundle: Dict[str, Any]) -> None:
@@ -179,6 +219,11 @@ def _image_browser_page(st, pd, bundle: Dict[str, Any]) -> None:
     image_by_id = {img["image_id"]: img for img in images}
     detectors = {d["detector_name"]: d for d in bundle["detectors"]}
     selected = st.multiselect("Overlay detectors", list(detectors), default=list(detectors)[:1])
+    with st.expander("Detector metrics", expanded=True):
+        metric_names = selected or list(detectors)[:1]
+        for name in metric_names:
+            st.markdown(f"**{name}**")
+            _render_metric_cards(st, detectors[name])
     error_types = sorted({m["status"] for d in detectors.values() for m in d["prediction_matches"]})
     selected_errors = st.multiselect("Error types", error_types, default=error_types)
     classes = bundle["dataset"]["classes"]
