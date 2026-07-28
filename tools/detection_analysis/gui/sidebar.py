@@ -21,7 +21,7 @@ def render_sidebar(st) -> Dict[str, Any]:
     names = st.sidebar.text_input("Detector names", help="Comma-separated, optional")
     st.sidebar.header("Thresholds")
     cfg = AnalysisConfig(
-        confidence_threshold=st.sidebar.slider("Confidence", 0.0, 1.0, 0.05, 0.01),
+        confidence_threshold=st.sidebar.slider("Confidence", 0.0, 1.0, 0.35, 0.01),
         tp_iou_threshold=st.sidebar.slider("TP IoU", 0.0, 1.0, 0.5, 0.01),
         localization_iou_min=st.sidebar.slider("Localization IoU min", 0.0, 1.0, 0.1, 0.01),
         duplicate_iou_threshold=st.sidebar.slider("Duplicate IoU", 0.0, 1.0, 0.5, 0.01),
@@ -37,4 +37,3 @@ def render_sidebar(st) -> Dict[str, Any]:
         "config_obj": cfg,
         "run": st.sidebar.button("Run analysis"),
     }
-

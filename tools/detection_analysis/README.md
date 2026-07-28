@@ -79,7 +79,7 @@ python tools/detection_analysis/analyze.py \
 Useful threshold flags:
 
 ```bash
---confidence-threshold 0.05
+--confidence-threshold 0.35
 --tp-iou-threshold 0.5
 --localization-iou-min 0.1
 --duplicate-iou-threshold 0.5
@@ -185,6 +185,13 @@ This order prevents one prediction from receiving conflicting primary categories
 - `exports/*_prediction_matches.csv`
 - `exports/*_ground_truth_matches.csv`
 - `report.html`
+- `visualizations/<detector>/predictions_only/`: original-resolution images
+  containing prediction overlays only (no ground-truth boxes).
+- `visualizations/<detector>/problems_only/`: original-resolution images that
+  have erroneous predictions or false negatives, containing only those problems.
+
+Both visualization exports omit predictions below confidence `0.35`. If the
+analysis confidence threshold is higher, the higher threshold is used instead.
 
 ## Tests
 
@@ -209,4 +216,3 @@ For unusual custom result pickles, the adapter needs enough information to recov
 - If COCO metrics are unavailable, install `pycocotools` or use the custom metrics produced by the core analyzer.
 - If images do not render in the GUI, check that config `data_root` and `data_prefix` resolve correctly, or provide `--img-prefix` for manual datasets.
 - If Streamlit is not installed, preprocessing still works with `analyze.py`; install GUI dependencies from this directory's requirements file to use `app.py`.
-
