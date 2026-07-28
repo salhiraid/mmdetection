@@ -10,7 +10,7 @@ from typing import Dict, Tuple
 class AnalysisConfig:
     """Thresholds and switches used by matching and metrics."""
 
-    confidence_threshold: float = 0.05
+    confidence_threshold: float = 0.35
     tp_iou_threshold: float = 0.5
     localization_iou_min: float = 0.1
     duplicate_iou_threshold: float = 0.5
@@ -41,4 +41,3 @@ class AnalysisConfig:
             raise ValueError("localization_iou_min cannot exceed tp_iou_threshold.")
         if self.max_detections_per_image <= 0:
             raise ValueError("max_detections_per_image must be positive.")
-

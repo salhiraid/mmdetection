@@ -18,6 +18,7 @@ if str(ROOT) not in sys.path:
 from tools.detection_analysis.cli import run_analysis_from_args
 from tools.detection_analysis.evaluation.confusion_matrix import build_confusion_matrix
 from tools.detection_analysis.evaluation.pr_curves import precision_recall_curve
+from tools.detection_analysis.export.image_exporter import MIN_VISUALIZATION_CONFIDENCE
 from tools.detection_analysis.gui.sidebar import render_sidebar
 from tools.detection_analysis.models import AnalysisBundle
 from tools.detection_analysis.utils.serialization import load_json, to_plain
@@ -218,13 +219,24 @@ def _image_browser_page(st, pd, bundle: Dict[str, Any]) -> None:
     images = bundle["dataset"]["images"]
     image_by_id = {img["image_id"]: img for img in images}
     detectors = {d["detector_name"]: d for d in bundle["detectors"]}
+    display_confidence = max(
+        MIN_VISUALIZATION_CONFIDENCE,
+        float(bundle.get("config", {}).get(
+            "confidence_threshold", MIN_VISUALIZATION_CONFIDENCE)),
+    )
+    st.caption(
+        f"Predictions are displayed at confidence {display_confidence:.2f} or higher."
+    )
     selected = st.multiselect("Overlay detectors", list(detectors), default=list(detectors)[:1])
     with st.expander("Detector metrics", expanded=True):
         metric_names = selected or list(detectors)[:1]
         for name in metric_names:
             st.markdown(f"**{name}**")
             _render_metric_cards(st, detectors[name])
-    error_types = sorted({m["status"] for d in detectors.values() for m in d["prediction_matches"]})
+    error_types = sorted({
+        m["status"] for d in detectors.values()
+        for m in d["prediction_matches"] if m["score"] >= display_confidence
+    })
     selected_errors = st.multiselect("Error types", error_types, default=error_types)
     classes = bundle["dataset"]["classes"]
     selected_classes = st.multiselect("Classes", classes)
@@ -251,6 +263,7 @@ def _image_browser_page(st, pd, bundle: Dict[str, Any]) -> None:
 
     all_selected_matches = [
         m for name in selected for m in detectors[name]["prediction_matches"]
+        if m["score"] >= display_confidence
     ]
     matches_by_image: Dict[str, List[Dict[str, Any]]] = {}
     for match in all_selected_matches:
@@ -309,6 +322,7 @@ def _image_browser_page(st, pd, bundle: Dict[str, Any]) -> None:
         matches.extend([
             m for m in detectors[name]["prediction_matches"]
             if m["image_id"] == image["image_id"]
+            and m["score"] >= display_confidence
             and m["status"] in selected_errors
             and (not hide_correct or m["status"] != "true_positive")
         ])
@@ -336,7 +350,10 @@ def _image_browser_page(st, pd, bundle: Dict[str, Any]) -> None:
         show_detector=show_detector_name,
     )
     st.caption(f"{selected_pos + 1} / {len(rows)} in {browse_mode.lower()} view - image {image['image_id']} - {image['file_name']}")
-    st.image(rendered, use_container_width=True)
+    # Pin the rendered width to the source pixel width instead of stretching or
+    # shrinking it to the Streamlit column. The renderer itself also preserves
+    # the source image dimensions.
+    st.image(rendered, width=rendered.width)
     st.dataframe(pd.DataFrame(matches), use_container_width=True)
 
 

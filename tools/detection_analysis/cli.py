@@ -14,6 +14,7 @@ from tools.detection_analysis.evaluation.detector_comparison import compare_dete
 from tools.detection_analysis.evaluation.matcher import match_detector
 from tools.detection_analysis.export.csv_exporter import export_bundle_csv
 from tools.detection_analysis.export.html_report import write_html_report
+from tools.detection_analysis.export.image_exporter import export_bundle_images
 from tools.detection_analysis.loaders.dataset_loader import load_dataset
 from tools.detection_analysis.loaders.result_adapter import normalize_result_file
 from tools.detection_analysis.models import AnalysisBundle, DetectorAnalysis
@@ -33,7 +34,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--names", nargs="*", help="Optional detector display names.")
     parser.add_argument("--output-dir", default="work_dirs/detection_analysis/latest", help="Directory for saved analysis.")
     parser.add_argument("--split", default="test", choices=["test", "val"], help="Config dataloader split.")
-    parser.add_argument("--confidence-threshold", type=float, default=0.05)
+    parser.add_argument("--confidence-threshold", type=float, default=0.35)
     parser.add_argument("--tp-iou-threshold", type=float, default=0.5)
     parser.add_argument("--localization-iou-min", type=float, default=0.1)
     parser.add_argument("--duplicate-iou-threshold", type=float, default=0.5)
@@ -119,6 +120,7 @@ def save_analysis(bundle: AnalysisBundle, output_dir: str | Path) -> None:
         dump_json(det_dir / "metrics.json", detector.metrics)
         dump_json(det_dir / "coco_metrics.json", detector.coco_metrics)
     export_bundle_csv(bundle, out / "exports")
+    export_bundle_images(bundle, out / "visualizations")
     write_html_report(bundle, out / "report.html")
 
 
@@ -140,4 +142,3 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
 
 if __name__ == "__main__":
     main()
-
